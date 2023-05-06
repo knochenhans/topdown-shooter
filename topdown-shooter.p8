@@ -3,22 +3,14 @@ version 41
 __lua__
 
 tile_size = 8
-player_map_x = 0
-player_map_y = 0
 
-
-function _init()
-    setup_player()
-    setup_enemy()
-end
+-- Definitions
 
 Character = {
-    x = 0.0,
-    y = 0.0,
+    pos = { x = 0, y = 0 },
     sprite_root = 0,
     current_sprite = 0,
-    flip_x = false,
-    flip_y = false,
+    flip { x = false, y = false },
     speed = 1.0,
     walk_anim = {1},
     walking = false,
@@ -37,60 +29,61 @@ function Character:new(o)
 end
 
 function Character:move(x, y)
-    local old_x = self.x
-    local old_y = self.y
-    local is_walking = false
+    local old_pos_x = self.pos.x
+    local old_pos_y = self.pos.y
+    
+    local is_moving = false
     local sprite = self.sprite_root
 
     if x == -1 and y == 0 then -- left
-        self.x -= self.speed
+        self.pos.x -= self.speed
         sprite += 16
-        self.flip_x = true
-        is_walking = true
+        self.flip.x = true
+        is_moving = true
     elseif x == 1 and y == 0 then -- right
-        self.x += self.speed
+        self.pos.x += self.speed
         sprite += 16
-        self.flip_x = false
-        is_walking = true
+        self.flip.x = false
+        is_moving = true
     elseif x == 0 and y == -1 then -- up
-        self.y -= self.speed
-        self.flip_y = false
-        is_walking = true
+        self.pos.y -= self.speed
+        self.flip.y = false
+        is_moving = true
     elseif x == 0 and y == 1 then -- down
-        self.y += self.speed
-        self.flip_y = true
-        is_walking = true
+        self.pos.y += self.speed
+        self.flip.y = true
+        is_moving = true
     elseif x == -1 and y == -1 then -- up-left
-        self.x -= self.speed / 2
-        self.y -= self.speed / 2
+        self.pos.x -= self.speed / 2
+        self.pos.y -= self.speed / 2
         sprite += 32
-        self.flip_x = true
-        self.flip_y = false
-        is_walking = true
+        self.flip.x = true
+        self.flip.y = false
+        is_moving = true
     elseif x == -1 and y == 1 then -- down-left
-        self.x -= self.speed / 2
-        self.y += self.speed / 2
+        self.pos.x -= self.speed / 2
+        self.pos.y += self.speed / 2
         sprite += 32
-        self.flip_x = true
-        self.flip_y = true
-        is_walking = true
+        self.flip.x = true
+        self.flip.y = true
+        is_moving = true
     elseif x == 1 and y == -1 then -- up-right
-        self.x += self.speed / 2
-        self.y -= self.speed / 2
+        self.pos.x += self.speed / 2
+        self.pos.y -= self.speed / 2
         sprite += 32
-        self.flip_x = false
-        self.flip_y = false
-        is_walking = true
+        self.flip.x = false
+        self.flip.y = false
+        is_moving = true
     elseif x == 1 and y == 1 then -- down-right
-        self.x += self.speed / 2
-        self.y += self.speed / 2
+        self.pos.x += self.speed / 2
+        self.pos.y += self.speed / 2
         sprite += 32
-        self.flip_x = false
-        self.flip_y = true
-        is_walking = true
+        self.flip.x = false
+        self.flip.y = true
+        is_moving = true
     end
 
-    -- if is_walking then
+    -- if is_moving then
     --     self.sprite = self.walk_anim[1]
     --     self.walking = true
     -- else
@@ -100,15 +93,17 @@ function Character:move(x, y)
     self.current_sprite = sprite
 
     -- Simple collision check for now
-    local character_map_x = flr((self.x + 4) / tile_size)
-    local character_map_y = flr((self.y + 4) / tile_size)
+    local character_map_x = flr((self.pos.x + 4) / tile_size)
+    local character_map_y = flr((self.pos.y + 4) / tile_size)
+
+    -- printh("Player is touching tile at map position (" .. character_map_x .. "," .. character_map_y .. ")")
 
     local collided = false
 
     if fget(mget(character_map_x, character_map_y), 0) then
         collided = true
-        self.x = old_x
-        self.y = old_y
+        self.pos.x = old_pos_x
+        self.pos.y = old_pos_y
     end
     
     self.collided = collided
@@ -147,36 +142,40 @@ function Character:ai()
     end
 end
 
-function setup_player()
+function Character:draw()
+    spr(self.current_sprite, self.pos.x, self.pos.y, 1, 1, self.flip.x, self.flip.y)
+end
+
+-- Setup
+
+function setup_characters()
     player = Character:new{
-        x = 20.0,
-        y = 20.0,
+        pos = { x = 20, y = 20 },
         sprite_root = 1,
         current_sprite = 1,
-        flip_x = true,
-        flip_y = false,
+        flip = { x = true, x = false },
         speed = 1.0,
-        walk_anim = {1, 2},
+        walk_anim = { 1, 2 },
         walking = false,
         player_controlled = true
     }
-end
 
-function setup_enemy()
     enemy = Character:new{
-        x = 40.0,
-        y = 40.0,
+        pos = { x = 40, y = 40 },
         sprite_root = 9,
         current_sprite = 9,
-        flip_x = true,
-        flip_y = false,
+        flip = { x = true, x = false },
         speed = 1.5,
-        walk_anim = {1},
+        walk_anim = { 1 },
         walking = false,
         player_controlled = false
     }
 
     enemy.direction.x = -1
+end
+
+function _init()
+    setup_characters()
 end
 
 function _update()
@@ -199,33 +198,14 @@ function _update()
         player:move(0, 1)
     end
 
-    enemy:move(enemy.direction.x, enemy.direction.y)
-    enemy:ai()
-    
     -- if btn(0) or btn(1) or btn(2) or btn(3) then
     --     player.walking = true
     -- else
     --     player.walking = false
     -- end
 
-    -- player_map_x = flr((player.x + 4) / tile_size)
-    -- player_map_y = flr((player.y + 4) / tile_size)
-
-    -- -- printh("Player is touching tile at map position (" .. player_map_x .. "," .. player_map_y .. ")")
-
-    -- if fget(mget(player_map_x, player_map_y), 0) then
-    --     player.x = old_x
-    --     player.y = old_y
-    -- end
-
-    -- if check_collision(player.x + 4, player.y + 4) then
-    --     printh("test " .. player.x .. "/" .. player.y)
-    --     player.x = old_x
-    --     player.y = old_y
-    -- end
-
-    -- enemy
-    -- enemy.x += enemy.speed
+    enemy:move(enemy.direction.x, enemy.direction.y)
+    enemy:ai()
 end
 
 -- function check_collision(x, y)
@@ -242,18 +222,19 @@ end
 
 function _draw()
     cls()
-    camera(-64 + player.x, -64 + player.y)
+    camera(-64 + player.pos.x, -64 + player.pos.y)
 
     -- map(player_map_x - 4, player_map_y - 4, 0, 0, player_map_x + 4, player_map_y + 4)
     map(0, 0, 0, 0)
-
-    spr(enemy.current_sprite, enemy.x, enemy.y, 1, 1)
     
     -- if player.walking then
-    --     spr(player.walk_anim[current_frame] + player.sprite, player.x, player.y, 1, 1, player.flip_x, player.flip_y)
+    --     spr(player.walk_anim[current_frame] + player.sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
     -- else
-    spr(player.current_sprite, player.x, player.y, 1, 1, player.flip_x, player.flip_y)
+    -- spr(player.current_sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
     -- end
+
+    player:draw()
+    enemy:draw()
 end
 __gfx__
 00000000000000000000000000000000500000560010101000000000000000000000000000000000000000000000000000000000000000000000000000000000
