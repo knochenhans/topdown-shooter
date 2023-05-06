@@ -35,52 +35,31 @@ function Character:move(x, y)
     local is_moving = false
     local sprite = self.sprite_root
 
-    if x == -1 and y == 0 then -- left
-        self.pos.x -= self.speed
-        sprite += 16
-        self.flip.x = true
-        is_moving = true
-    elseif x == 1 and y == 0 then -- right
-        self.pos.x += self.speed
-        sprite += 16
-        self.flip.x = false
-        is_moving = true
-    elseif x == 0 and y == -1 then -- up
-        self.pos.y -= self.speed
-        self.flip.y = false
-        is_moving = true
-    elseif x == 0 and y == 1 then -- down
-        self.pos.y += self.speed
-        self.flip.y = true
-        is_moving = true
-    elseif x == -1 and y == -1 then -- up-left
-        self.pos.x -= self.speed / 2
-        self.pos.y -= self.speed / 2
-        sprite += 32
-        self.flip.x = true
-        self.flip.y = false
-        is_moving = true
-    elseif x == -1 and y == 1 then -- down-left
-        self.pos.x -= self.speed / 2
-        self.pos.y += self.speed / 2
-        sprite += 32
-        self.flip.x = true
-        self.flip.y = true
-        is_moving = true
-    elseif x == 1 and y == -1 then -- up-right
-        self.pos.x += self.speed / 2
-        self.pos.y -= self.speed / 2
-        sprite += 32
-        self.flip.x = false
-        self.flip.y = false
-        is_moving = true
-    elseif x == 1 and y == 1 then -- down-right
-        self.pos.x += self.speed / 2
-        self.pos.y += self.speed / 2
-        sprite += 32
-        self.flip.x = false
-        self.flip.y = true
-        is_moving = true
+    local move_table = {
+        {x = -1, y = 0, sprite_offset = 16, flip_x = true, flip_y = false},
+        {x = 1, y = 0, sprite_offset = 16, flip_x = false, flip_y = false},
+        {x = 0, y = -1, sprite_offset = 0, flip_x = false, flip_y = false},
+        {x = 0, y = 1, sprite_offset = 0, flip_x = false, flip_y = true},
+        {x = -1, y = -1, sprite_offset = 32, flip_x = true, flip_y = false},
+        {x = -1, y = 1, sprite_offset = 32, flip_x = true, flip_y = true},
+        {x = 1, y = -1, sprite_offset = 32, flip_x = false, flip_y = false},
+        {x = 1, y = 1, sprite_offset = 32, flip_x = false, flip_y = true}
+    }
+    
+    local move = nil
+        for i = 1, #move_table do
+        if move_table[i].x == x and move_table[i].y == y then
+            move = move_table[i]
+            break
+        end
+    end
+    
+    if move then
+        self.pos.x += move.x * self.speed
+        self.pos.y += move.y * self.speed
+        self.flip.x = move.flip_x
+        self.flip.y = move.flip_y
+        sprite += move.sprite_offset
     end
 
     -- if is_moving then
