@@ -10,14 +10,13 @@ player_map_y = 0
 function _init()
     setup_player()
     setup_enemy()
-
-    printh(player.walk_anim[current_frame])
 end
 
 Character = {
     x = 0.0,
     y = 0.0,
-    sprite = 0,
+    sprite_root = 0,
+    current_sprite = 0,
     flip_x = false,
     flip_y = false,
     speed = 1.0,
@@ -25,7 +24,9 @@ Character = {
     walking = false,
     current_frame = 1,
     anim_timer = 0,
-    player_controlled = false
+    player_controlled = false,
+    collided = false,
+    direction = { x = 0, y = 0 }
 }
 
 function Character:new(o)
@@ -35,52 +36,52 @@ function Character:new(o)
     return o
 end
 
-function Character:move(direction)
+function Character:move(x, y)
     local old_x = self.x
     local old_y = self.y
     local is_walking = false
-    local sprite = self.sprite
+    local sprite = self.sprite_root
 
-    if direction == "left" then
+    if x == -1 and y == 0 then -- left
         self.x -= self.speed
         sprite += 16
         self.flip_x = true
         is_walking = true
-    elseif direction == "right" then
+    elseif x == 1 and y == 0 then -- right
         self.x += self.speed
         sprite += 16
         self.flip_x = false
         is_walking = true
-    elseif direction == "up" then
+    elseif x == 0 and y == -1 then -- up
         self.y -= self.speed
         self.flip_y = false
         is_walking = true
-    elseif direction == "down" then
+    elseif x == 0 and y == 1 then -- down
         self.y += self.speed
         self.flip_y = true
         is_walking = true
-    elseif direction == "up-left" then
+    elseif x == -1 and y == -1 then -- up-left
         self.x -= self.speed / 2
         self.y -= self.speed / 2
         sprite += 32
         self.flip_x = true
         self.flip_y = false
         is_walking = true
-    elseif direction == "down-left" then
+    elseif x == -1 and y == 1 then -- down-left
         self.x -= self.speed / 2
         self.y += self.speed / 2
         sprite += 32
         self.flip_x = true
         self.flip_y = true
         is_walking = true
-    elseif direction == "up-right" then
+    elseif x == 1 and y == -1 then -- up-right
         self.x += self.speed / 2
         self.y -= self.speed / 2
         sprite += 32
         self.flip_x = false
         self.flip_y = false
         is_walking = true
-    elseif direction == "down-right" then
+    elseif x == 1 and y == 1 then -- down-right
         self.x += self.speed / 2
         self.y += self.speed / 2
         sprite += 32
@@ -89,22 +90,28 @@ function Character:move(direction)
         is_walking = true
     end
 
-    if is_walking then
-        self.sprite = self.walk_anim[1]
-        self.walking = true
-    else
-        self.sprite = sprite
-        self.walking = false
-    end
+    -- if is_walking then
+    --     self.sprite = self.walk_anim[1]
+    --     self.walking = true
+    -- else
+    --     self.sprite = sprite
+    --     self.walking = false
+    -- end
+    self.current_sprite = sprite
 
+    -- Simple collision check for now
     local character_map_x = flr((self.x + 4) / tile_size)
     local character_map_y = flr((self.y + 4) / tile_size)
 
+    local collided = false
+
     if fget(mget(character_map_x, character_map_y), 0) then
+        collided = true
         self.x = old_x
         self.y = old_y
     end
-
+    
+    self.collided = collided
     -- -- Update the timer
     -- self.anim_timer += 1
 
@@ -115,11 +122,37 @@ function Character:move(direction)
     -- end
 end
 
+function Character:ai()
+    local new_direction = {x = self.direction.x, y = self.direction.y}
+
+    -- Randomly change direction
+    if rnd(50) < 2 then
+        rand_x = flr(rnd(3)) - 1
+        rand_y = flr(rnd(3)) - 1
+
+        if rand_x == self.direction.x or rand_y == self.direction.y then
+            new_direction.x = rand_x
+            new_direction.y = rand_y
+        end
+
+        self.direction = new_direction
+    end
+    
+    if self.collided then        
+        new_direction.x = rand_x
+        new_direction.y = rand_y
+
+        self.direction = new_direction
+        self.collided = false
+    end
+end
+
 function setup_player()
     player = Character:new{
         x = 20.0,
         y = 20.0,
-        sprite = 1,
+        sprite_root = 1,
+        current_sprite = 1,
         flip_x = true,
         flip_y = false,
         speed = 1.0,
@@ -133,38 +166,41 @@ function setup_enemy()
     enemy = Character:new{
         x = 40.0,
         y = 40.0,
-        sprite = 9,
+        sprite_root = 9,
+        current_sprite = 9,
         flip_x = true,
         flip_y = false,
-        speed = 0.5,
+        speed = 1.5,
         walk_anim = {1},
         walking = false,
         player_controlled = false
     }
+
+    enemy.direction.x = -1
 end
 
 function _update()
     -- player
     if btn(0) and btn(2) then -- up-left
-        player:move("up-left")
+        player:move(-1, -1)
     elseif btn(0) and btn(3) then -- down-left
-        player:move("down-left")
+        player:move(-1, 1)
     elseif btn(1) and btn(2) then -- up-right
-        player:move("up-right")
+        player:move(1, -1)
     elseif btn(1) and btn(3) then -- down-right
-        player:move("down-right")
+        player:move(1, 1)
     elseif btn(0) then -- left
-        player:move("left")
+        player:move(-1, 0)
     elseif btn(1) then -- right
-        player:move("right")
+        player:move(1, 0)
     elseif btn(2) then -- up
-        player:move("up")
+        player:move(0, -1)
     elseif btn(3) then -- down
-        player:move("down")
+        player:move(0, 1)
     end
 
-    enemy:move("right")
-    
+    enemy:move(enemy.direction.x, enemy.direction.y)
+    enemy:ai()
     
     -- if btn(0) or btn(1) or btn(2) or btn(3) then
     --     player.walking = true
@@ -211,37 +247,37 @@ function _draw()
     -- map(player_map_x - 4, player_map_y - 4, 0, 0, player_map_x + 4, player_map_y + 4)
     map(0, 0, 0, 0)
 
-    spr(enemy.sprite, enemy.x, enemy.y, 1, 1)
+    spr(enemy.current_sprite, enemy.x, enemy.y, 1, 1)
     
     -- if player.walking then
     --     spr(player.walk_anim[current_frame] + player.sprite, player.x, player.y, 1, 1, player.flip_x, player.flip_y)
     -- else
-    spr(player.sprite, player.x, player.y, 1, 1, player.flip_x, player.flip_y)
+    spr(player.current_sprite, player.x, player.y, 1, 1, player.flip_x, player.flip_y)
     -- end
 end
 __gfx__
 00000000000000000000000000000000500000560010101000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000f00ff00f000ff01ff10ff00000506005011d1d1100000000000000000000000000000000000000000000000000000000000000000000000000000000
-0070070011555511115555111155551105050500111111d000000000000000000000000000133100000000000000000000000000000000000000000000000000
-00077000dd5555dddd5555dddd5555dd0050505001111111000000000000000000000000003bb300000000000000000000000000000000000000000000000000
-000770001dd55dd11dd55dd11dd55dd105050600111111d0000000000000000000000000003bb300000000000000000000000000000000000000000000000000
-00700700000000000f100000000001f0005050500111111100000000000000000000000000133100000000000000000000000000000000000000000000000000
+0070070011555511115555111155551105050500111111d000000000000000000000000000133100001331000013310000000000000000000000000000000000
+00077000dd5555dddd5555dddd5555dd0050505001111111000000000000000000000000003bb300003bb300003bb30000000000000000000000000000000000
+000770001dd55dd11dd55dd11dd55dd105050600111111d0000000000000000000000000003bb300003bb300003bb30000000000000000000000000000000000
+00700700000000000f100000000001f0005050500111111100000000000000000000000000133100001331000013310000000000000000000000000000000000
 00000000000000000010000000000100050505001111111000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000050101010000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000001d1f00001d1000001d1f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000dd10000fdd100000dd110000100600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000d5500011d5500000d5500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000555f0000555f0000555f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000555f0000555f0000555f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000d5500000d5500011d5500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000d5500011d5500000d5500000000000000000000000000000000000000000000133100001331000013310000000000000000000000000000000000
+00000000000555f0000555f0000555f00000000000000000000000000000000000000000003bb300003bb300003bb30000000000000000000000000000000000
+00000000000555f0000555f0000555f00000000000000000000000000000000000000000003bb300003bb300003bb30000000000000000000000000000000000
+00000000000d5500000d5500011d5500000000000000000000000000000000000000000000133100001331000013310000000000000000000000000000000000
 00000000000dd100000dd11000fdd100000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000001d1f00001d1f00001d100060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000ddf00000dd000000ddf0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000001ddd5f00dddd5f001ddd5f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000dd555f0fdd555f00dd555f0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000d5555011d5555000d55550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000555df100555df000555d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000000dddd0000dddd0000dddd000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000000000dd555f0fdd555f00dd555f0000000000000000000000000000000000000000000133100001331000013310000000000000000000000000000000000
+0000000000d5555011d5555000d555500000000000000000000000000000000000000000003bb300003bb300003bb30000000000000000000000000000000000
+00000000000555df100555df000555d00000000000000000000000000000000000000000003bb300003bb300003bb30000000000000000000000000000000000
+000000000000dddd0000dddd0000dddd000000000000000000000000000000000000000000133100001331000013310000000000000000000000000000000000
 0000000000000dd100000dd100001dd1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000100000001000011f10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __gff__
