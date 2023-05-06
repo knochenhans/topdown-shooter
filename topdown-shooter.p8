@@ -9,11 +9,12 @@ tile_size = 8
 Character = {
     pos = { x = 0, y = 0 },
     sprite_root = 0,
-    current_sprite = 0,
+    current_sprite_offset = 0,
     flip { x = false, y = false },
     speed = 1.0,
-    walk_anim = {1},
-    walking = false,
+    move_anim = { 1 },
+    move_sfx = { 0 },
+    move_state = "idle",
     current_frame = 1,
     anim_timer = 0,
     player_controlled = false,
@@ -32,18 +33,15 @@ function Character:move(x, y)
     local old_pos_x = self.pos.x
     local old_pos_y = self.pos.y
     
-    local is_moving = false
-    local sprite = self.sprite_root
-
     local move_table = {
-        {x = -1, y = 0, sprite_offset = 16, flip_x = true, flip_y = false},
-        {x = 1, y = 0, sprite_offset = 16, flip_x = false, flip_y = false},
-        {x = 0, y = -1, sprite_offset = 0, flip_x = false, flip_y = false},
-        {x = 0, y = 1, sprite_offset = 0, flip_x = false, flip_y = true},
-        {x = -1, y = -1, sprite_offset = 32, flip_x = true, flip_y = false},
-        {x = -1, y = 1, sprite_offset = 32, flip_x = true, flip_y = true},
-        {x = 1, y = -1, sprite_offset = 32, flip_x = false, flip_y = false},
-        {x = 1, y = 1, sprite_offset = 32, flip_x = false, flip_y = true}
+        {x = -1, y = 0, current_sprite_offset = 16, flip_x = true, flip_y = false},
+        {x = 1, y = 0, current_sprite_offset = 16, flip_x = false, flip_y = false},
+        {x = 0, y = -1, current_sprite_offset = 0, flip_x = false, flip_y = false},
+        {x = 0, y = 1, current_sprite_offset = 0, flip_x = false, flip_y = true},
+        {x = -1, y = -1, current_sprite_offset = 32, flip_x = true, flip_y = false},
+        {x = -1, y = 1, current_sprite_offset = 32, flip_x = true, flip_y = true},
+        {x = 1, y = -1, current_sprite_offset = 32, flip_x = false, flip_y = false},
+        {x = 1, y = 1, current_sprite_offset = 32, flip_x = false, flip_y = true}
     }
     
     local move = nil
@@ -59,17 +57,8 @@ function Character:move(x, y)
         self.pos.y += move.y * self.speed
         self.flip.x = move.flip_x
         self.flip.y = move.flip_y
-        sprite += move.sprite_offset
+        self.current_sprite_offset = move.current_sprite_offset
     end
-
-    -- if is_moving then
-    --     self.sprite = self.walk_anim[1]
-    --     self.walking = true
-    -- else
-    --     self.sprite = sprite
-    --     self.walking = false
-    -- end
-    self.current_sprite = sprite
 
     -- Simple collision check for now
     local character_map_x = flr((self.pos.x + 4) / tile_size)
@@ -77,23 +66,26 @@ function Character:move(x, y)
 
     -- printh("Player is touching tile at map position (" .. character_map_x .. "," .. character_map_y .. ")")
 
-    local collided = false
-
     if fget(mget(character_map_x, character_map_y), 0) then
-        collided = true
         self.pos.x = old_pos_x
         self.pos.y = old_pos_y
+        if not self.collided then
+            sfx(1)
+            self.collided = true
+            self.stop()
+        end
+    else
+        self.collided = false
     end
-    
-    self.collided = collided
-    -- -- Update the timer
-    -- self.anim_timer += 1
 
-    -- -- If the timer has reached the animation speed, switch to the next frame
-    -- if self.anim_timer >= 60 / 8 then
-    --     self.anim_timer = 0
-    --     self.current_frame = self.current_frame % #self.walk_anim + 1
-    -- end
+    if self.pos.x != old_pos_x or self.pos.y != old_pos_y then
+        if self.move_state == "idle" then
+            self.move_state = "start"
+            sfx(0)
+        elseif self.move_state == "start" then
+            self.move_state = "moving"
+        end
+    end
 end
 
 function Character:ai()
@@ -117,12 +109,36 @@ function Character:ai()
         new_direction.y = rand_y
 
         self.direction = new_direction
+                
         self.collided = false
     end
 end
 
 function Character:draw()
-    spr(self.current_sprite, self.pos.x, self.pos.y, 1, 1, self.flip.x, self.flip.y)
+    if self.move_state == "moving" then
+        self.anim_timer += 1
+    
+        -- If the timer has reached the animation speed, switch to the next frame
+        if self.anim_timer >= 60 / 8 then
+            self.anim_timer = 0
+            self.current_frame = self.current_frame % #self.move_anim + 1
+        end
+    end
+
+    -- When character moves, use it's animation frames (1 and 2 after idle frame)
+    local sprite_offset = self.sprite_root + self.current_sprite_offset + (self.move_state == "moving" and self.current_frame or 0)
+    spr(sprite_offset, self.pos.x, self.pos.y, 1, 1, self.flip.x, self.flip.y)
+end
+
+function Character:update()
+    if self.move_state == "moving" then
+        
+    end
+end
+
+function Character:stop()
+    player.move_state = "idle"
+    sfx(-2)
 end
 
 -- Setup
@@ -134,8 +150,7 @@ function setup_characters()
         current_sprite = 1,
         flip = { x = true, x = false },
         speed = 1.0,
-        walk_anim = { 1, 2 },
-        walking = false,
+        move_anim = { 1, 2 },
         player_controlled = true
     }
 
@@ -145,8 +160,7 @@ function setup_characters()
         current_sprite = 9,
         flip = { x = true, x = false },
         speed = 1.5,
-        walk_anim = { 1 },
-        walking = false,
+        move_anim = { 1 },
         player_controlled = false
     }
 
@@ -175,16 +189,14 @@ function _update()
         player:move(0, -1)
     elseif btn(3) then -- down
         player:move(0, 1)
+    else
+        player:stop()
     end
 
-    -- if btn(0) or btn(1) or btn(2) or btn(3) then
-    --     player.walking = true
-    -- else
-    --     player.walking = false
-    -- end
+    player:update()
 
-    enemy:move(enemy.direction.x, enemy.direction.y)
-    enemy:ai()
+    -- enemy:move(enemy.direction.x, enemy.direction.y)
+    -- enemy:ai()
 end
 
 -- function check_collision(x, y)
@@ -206,14 +218,14 @@ function _draw()
     -- map(player_map_x - 4, player_map_y - 4, 0, 0, player_map_x + 4, player_map_y + 4)
     map(0, 0, 0, 0)
     
-    -- if player.walking then
-    --     spr(player.walk_anim[current_frame] + player.sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
+    -- if player.is_moving then
+    --     spr(player.move_anim[current_frame] + player.sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
     -- else
     -- spr(player.current_sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
     -- end
 
-    player:draw()
     enemy:draw()
+    player:draw()
 end
 __gfx__
 00000000000000000000000000000000500000560010101000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -268,3 +280,6 @@ __map__
 1414141414141414140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1414141414141414140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1414140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+__sfx__
+0001002514650086500a650096500265004600006000060006600006000c600006000060003640026200060000600006000060000600006000060003630026100562000600006000060000600006000060000600
+00010000291102713025140211501d1500815006130081300a1400e1400c1400b1400515002150061500014000130011200011000100001000010007100001000610002100031000310000100001000010000100
