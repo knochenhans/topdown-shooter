@@ -7,7 +7,7 @@ tile_size = 8
 -- Definitions
 
 Character = {
-    pos = { x = 0, y = 0 },
+    pos = { x = 0, y = 0, w = 8, h = 8 },
     sprite_root = 0,
     current_sprite_offset = 0,
     flip { x = false, y = false },
@@ -45,7 +45,7 @@ function Character:move(x, y)
     }
     
     local move = nil
-        for i = 1, #move_table do
+    for i = 1, #move_table do
         if move_table[i].x == x and move_table[i].y == y then
             move = move_table[i]
             break
@@ -59,14 +59,31 @@ function Character:move(x, y)
         self.flip.y = move.flip_y
         self.current_sprite_offset = move.current_sprite_offset
     end
-
-    -- Simple collision check for now
+    
+    -- Simple tile collision check for now
     local character_map_x = flr((self.pos.x + 4) / tile_size)
     local character_map_y = flr((self.pos.y + 4) / tile_size)
-
+    
     -- printh("Player is touching tile at map position (" .. character_map_x .. "," .. character_map_y .. ")")
+    
+    local is_colliding = false
 
-    if fget(mget(character_map_x, character_map_y), 0) then
+    is_colliding = fget(mget(character_map_x, character_map_y), 0)
+
+    -- if self.pos != enemy.pos then
+    --     enemy_collision = overlap(self.pos, enemy.pos)
+    --     printh(enemy_collision)
+    --     is_colliding = is_colliding or enemy_collision
+    -- end
+
+    -- if not self.player_controlled then
+    --     if self.pos != player.pos then
+    --         enemy_collision = overlap(player.pos, enemy.pos)
+    --         printh(enemy_collision)
+    --     end
+    -- end
+
+    if is_colliding then
         self.pos.x = old_pos_x
         self.pos.y = old_pos_y
         if not self.collided then
@@ -77,7 +94,7 @@ function Character:move(x, y)
     else
         self.collided = false
     end
-
+    
     if self.pos.x != old_pos_x or self.pos.y != old_pos_y then
         if self.move_state == "idle" then
             self.move_state = "start"
@@ -90,62 +107,88 @@ end
 
 function Character:ai()
     local new_direction = {x = self.direction.x, y = self.direction.y}
-
+    
     -- Randomly change direction
-    if rnd(50) < 2 then
-        rand_x = flr(rnd(3)) - 1
-        rand_y = flr(rnd(3)) - 1
+    -- if rnd(50) < 2 then
+    --     rand_x = flr(rnd(3)) - 1
+    --     rand_y = flr(rnd(3)) - 1
+        
+    --     if rand_x == self.direction.x or rand_y == self.direction.y then
+    --         new_direction.x = rand_x
+    --         new_direction.y = rand_y
+    --     end
 
-        if rand_x == self.direction.x or rand_y == self.direction.y then
-            new_direction.x = rand_x
-            new_direction.y = rand_y
-        end
-
-        self.direction = new_direction
-    end
+    --     self.direction = new_direction
+    -- end
     
     if self.collided then        
-        new_direction.x = rand_x
-        new_direction.y = rand_y
-
+        new_direction.x = -self.direction.x
+        new_direction.y = -self.direction.y
+        
         self.direction = new_direction
-                
+        
         self.collided = false
     end
 end
 
 function Character:draw()
+    circfill(self.pos.x + 4, self.pos.y + 6, 3, 0)
+    
     if self.move_state == "moving" then
         self.anim_timer += 1
-    
+        
         -- If the timer has reached the animation speed, switch to the next frame
         if self.anim_timer >= 60 / 8 then
             self.anim_timer = 0
             self.current_frame = self.current_frame % #self.move_anim + 1
-        end
-    end
-
+        end    
+    end    
+    
     -- When character moves, use it's animation frames (1 and 2 after idle frame)
     local sprite_offset = self.sprite_root + self.current_sprite_offset + (self.move_state == "moving" and self.current_frame or 0)
     spr(sprite_offset, self.pos.x, self.pos.y, 1, 1, self.flip.x, self.flip.y)
 end
 
-function Character:update()
-    if self.move_state == "moving" then
+-- function Character:update()
+--     if self.move_state == "moving" then
         
-    end
-end
+--     end
+-- end
 
 function Character:stop()
     player.move_state = "idle"
     sfx(-2)
 end
 
+Object = {
+    pos = { x = 0, y = 0, w = 8, h = 8 },
+    sprite_root = 0,
+    collectable = true,
+}
+
+function Object:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self
+    return o
+end
+
+function Object:draw()
+    spr(self.sprite_root, self.pos.x, self.pos.y)
+end
+
+function overlap(a, b)
+    return not (a.x > b.x + b.w 
+             or a.y > b.y + b.h 
+             or a.x + a.w < b.x 
+             or a.y + a.h < b.y)
+end
+
 -- Setup
 
 function setup_characters()
     player = Character:new{
-        pos = { x = 20, y = 20 },
+        pos = { x = 20, y = 20, w = 5, h = 5 },
         sprite_root = 1,
         current_sprite = 1,
         flip = { x = true, x = false },
@@ -155,7 +198,7 @@ function setup_characters()
     }
 
     enemy = Character:new{
-        pos = { x = 40, y = 40 },
+        pos = { x = 40, y = 40, w = 5, h = 5 },
         sprite_root = 9,
         current_sprite = 9,
         flip = { x = true, x = false },
@@ -167,8 +210,26 @@ function setup_characters()
     enemy.direction.x = -1
 end
 
+local coin_positions = {
+    { x = 40, y = 60 },
+    { x = 80, y = 100 },
+    { x = 120, y = 140 },
+}
+
+coins = {}
+
 function _init()
     setup_characters()
+
+    local positions = {
+        { x = 40, y = 60 },
+        { x = 80, y = 60 },
+        { x = 120, y = 60 },
+    }
+
+    for i, pos in ipairs(positions) do
+        add(coins, Object:new{ pos = { x = pos.x, y = pos.y, w = 8, h = 8 }, sprite_root = 64 })
+    end
 end
 
 function _update()
@@ -193,10 +254,39 @@ function _update()
         player:stop()
     end
 
-    player:update()
+    -- player:update()
 
-    -- enemy:move(enemy.direction.x, enemy.direction.y)
-    -- enemy:ai()
+    enemy:move(enemy.direction.x, enemy.direction.y)
+    enemy:ai()
+
+    for c in all(coins) do
+        if overlap(player.pos, c.pos) then
+            del(coins, c)
+            sfx(2)
+        end
+    end
+
+
+    if overlap(player.pos, enemy.pos) then
+        sfx(3)
+    end
+end
+
+function _draw()
+    cls()
+    camera(-64 + player.pos.x, -64 + player.pos.y)
+
+    -- map(player_map_x - 4, player_map_y - 4, 0, 0, player_map_x + 4, player_map_y + 4)
+    map(0, 0, 0, 0)
+
+    -- coin:draw()
+
+    for c in all(coins) do
+        c:draw()
+    end
+
+    enemy:draw()
+    player:draw()
 end
 
 -- function check_collision(x, y)
@@ -210,23 +300,6 @@ end
 --        return false
 --     end
 -- end
-
-function _draw()
-    cls()
-    camera(-64 + player.pos.x, -64 + player.pos.y)
-
-    -- map(player_map_x - 4, player_map_y - 4, 0, 0, player_map_x + 4, player_map_y + 4)
-    map(0, 0, 0, 0)
-    
-    -- if player.is_moving then
-    --     spr(player.move_anim[current_frame] + player.sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
-    -- else
-    -- spr(player.current_sprite, player.x, player.y, 1, 1, player.flip.x, player.flip.y)
-    -- end
-
-    enemy:draw()
-    player:draw()
-end
 __gfx__
 00000000000000000000000000000000500000560010101000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000f00ff00f000ff01ff10ff00000506005011d1d1100000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -252,6 +325,20 @@ __gfx__
 000000000000dddd0000dddd0000dddd000000000000000000000000000000000000000000133100001331000013310000000000000000000000000000000000
 0000000000000dd100000dd100001dd1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000100000001000011f10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0009a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00999a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00999a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0009a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __gff__
 0000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -281,5 +368,7 @@ __map__
 1414141414141414140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 1414140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
-0001002514650086500a650096500265004600006000060006600006000c600006000060003640026200060000600006000060000600006000060003630026100562000600006000060000600006000060000600
-00010000291102713025140211501d1500815006130081300a1400e1400c1400b1400515002150061500014000130011200011000100001000010007100001000610002100031000310000100001000010000100
+5001002517650106500d6400c6400b6400464006600036000360008600036000e6000360003600056400462003600036000360003600036000360003600056300461007620036000360003600036000360003600
+48010000241102713025140211501d1500815006130081300a1400e1400c1400b1400515002150061500014000130011200011000100001000010007100001000610002100031000310000100001000010000100
+0006000039550385003955038500395502e5001a200192001520013200102000c2000a20008200062000520003200000000000000000000000000000000000000000000000000000000000000000000000000000
+080100002d6102f63022140201401f150191501615014150101500e1500d1500b1500815008150061500515004140041300312003120031100311002100011000010004100031000210000100001000000000000
